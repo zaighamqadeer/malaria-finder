@@ -147,20 +147,35 @@ DATASETS: dict[str, DatasetSpec] = {
 NON_COMMERCIAL_DATASETS = {"bbbc041"}
 
 
+def _resolve_manifest(spec: DatasetSpec, root: Path) -> Path | None:
+    """Find a dataset's manifest, tolerating the registry path or data/<key>/.
+
+    ``src/prepare_data.py`` writes to the registry path, but an older run may
+    have left the manifest at ``data/<dataset-key>/`` instead. Checking both
+    keeps a previously-staged dataset usable rather than silently ignoring it.
+    """
+    candidates: list[Path] = []
+    if spec.manifest:
+        candidates.append(root / spec.manifest)
+    candidates.append(root / "data" / spec.key / "manifest.json")
+    for cand in candidates:
+        if cand.exists():
+            return cand
+    return None
+
+
 def resolve_records(spec: DatasetSpec, limit: int | None = None) -> list[dict[str, Any]]:
     root = REPO_ROOT
-    if spec.manifest:
-        mpath = root / spec.manifest
-        if mpath.exists():
-            records = load_manifest(mpath)
-        elif spec.folder and (root / spec.folder).exists():
-            records = scan_image_folder(root / spec.folder, domain=spec.domain)
-        else:
-            raise FileNotFoundError(_dataset_hint(spec, mpath))
-    elif spec.folder:
+    manifest = _resolve_manifest(spec, root)
+    if manifest is not None:
+        records = load_manifest(manifest)
+        if spec.manifest and str(manifest) != str(root / spec.manifest):
+            print(f"[train] note: {spec.key} manifest found at {manifest} "
+                  f"instead of {spec.manifest}")
+    elif spec.folder and (root / spec.folder).exists():
         records = scan_image_folder(root / spec.folder, domain=spec.domain)
     else:
-        raise ValueError(f"Dataset '{spec.key}' has neither manifest nor folder configured")
+        raise FileNotFoundError(_dataset_hint(spec, root / (spec.manifest or "")))
 
     if limit and limit > 0:
         # Sample stratified by label so a tiny dev run keeps both classes.

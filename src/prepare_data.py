@@ -112,6 +112,23 @@ CLASS_FOLDERS = {
 }
 
 
+def _registry_manifest_path(dataset_key: str) -> Path | None:
+    """Where ``src/train.py`` expects this dataset's manifest to live.
+
+    Returns ``None`` when the key is not in the trainer's registry, so callers
+    fall back to their own default location. Imported lazily to avoid importing
+    torch at `--list` time.
+    """
+    try:
+        from .train import DATASETS, REPO_ROOT
+    except Exception:  # pragma: no cover - torch missing, run as a script, ...
+        return None
+    spec = DATASETS.get(dataset_key)
+    if spec is None or not spec.manifest:
+        return None
+    return REPO_ROOT / spec.manifest
+
+
 def _rime(message: str = "", end: str = "\n") -> None:  # pragma: no cover - cosmetic
     print(message, end=end, flush=True)
 
@@ -316,6 +333,33 @@ def write_manifest(records: list[dict[str, Any]], info: SourceInfo,
     return manifest_path
 
 
+def _dedupe_records(records: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    """Drop records whose *filename* was already indexed.
+
+    ``root.rglob()`` never yields the same path twice, so duplicates mean two
+    copies of the tree exist. They are distinct files, so path identity will not
+    catch them - but a crop is identified by its filename (``src/dataset.py``
+    derives its slide id from exactly that), so the basename is the right key.
+
+    This matters: the NIH Kaggle archive unzipped twice (or into a directory
+    that already held an extraction) reports 55,116 images instead of 27,558.
+    The set is silently doubled, every epoch sees each crop twice, and the
+    patient-level split then puts the *same* image in train and val.
+    """
+    # Key on (label, filename): basename alone can collide across the two class
+    # folders, and collapsing those would silently drop real training data.
+    seen: dict[tuple[int, str], int] = {}
+    unique: list[dict[str, Any]] = []
+    for rec in records:
+        key = (int(rec.get("label", -1)), Path(rec["path"]).name)
+        if key in seen:
+            seen[key] += 1
+            continue
+        seen[key] = 1
+        unique.append(rec)
+    return unique, len(records) - len(unique)
+
+
 def existing_counts(root: Path) -> tuple[int, int]:
     records = collect_records(root, "x", "x", "x")
     return (sum(1 for r in records if int(r["label"]) == 0),
@@ -360,8 +404,18 @@ def run(args: argparse.Namespace) -> int:
         return 2
 
     info = SOURCES[args.dataset]
-    work_dir = Path(args.work_dir or REPO_ROOT / "data" / args.dataset)
-    manifest_path = work_dir / "manifest.json"
+
+    # The dataset registry in src/train.py is the single source of truth for
+    # where a manifest must live, otherwise `--dataset nih_full` writes
+    # data/nih_full/manifest.json while the trainer looks for data/nih/. Derive
+    # the path from the registry when we recognise the key.
+    registry_path = _registry_manifest_path(args.dataset)
+    if registry_path is not None:
+        work_dir = registry_path.parent
+        manifest_path = registry_path
+    else:
+        work_dir = Path(args.work_dir or REPO_ROOT / "data" / args.dataset)
+        manifest_path = work_dir / "manifest.json"
 
     if manifest_path.exists() and not args.force:
         payload = json.loads(manifest_path.read_text())
@@ -393,6 +447,14 @@ def run(args: argparse.Namespace) -> int:
     label_map = load_label_map(Path(args.labels_file)) if args.labels_file else None
     records = collect_records(source_dir, info.domain, info.source_name,
                               info.license, label_map=label_map)
+    records, duplicates = _dedupe_records(records)
+    if duplicates:
+        _rime(f"[prepare] WARNING dropped {duplicates:,} records whose filename was "
+              f"already indexed - the source holds two copies of the tree. This "
+              f"usually means an archive was unzipped twice, leaving a nested "
+              f"cell_images/ (or similar). Check with:\n"
+              f"    find {source_dir} -maxdepth 2 -type d\n"
+              f"and point --local-dir at the single copy you want to index.")
     if not records:
         _rime("[prepare] ERROR no labelled images found. Expected either\n"
               "  <dir>/{Parasitized,Uninfected}/**  (label from folder name) or\n"

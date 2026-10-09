@@ -56,13 +56,46 @@ The NIH Malaria Dataset is registration-gated on LHNCBC; the Kaggle mirror
 Easiest path: download it locally once, then push up.
 
 ```bash
-# Locally, after you have the cell_images/ folder
-gsutil -m rsync -r ~/Downloads/cell_images gs://YOUR_BUCKET/nih/cell_images
+# Locally (or on the VM - it is only ~675 MB)
+kaggle datasets download -d iarunava/cell-images-for-detecting-malaria --unzip -p data/nih/
+
+# Then index it. NOTE the flag is --dataset nih_full but the manifest lands in
+# data/nih/ - the trainer's registry is the source of truth for the path.
+python src/prepare_data.py --dataset nih_full --local-dir data/nih/cell_images
 ```
 
-> If you cannot get NIH before the VM run, run Stage 2 from the Lacuna-warmed
-> checkpoint you already have and re-do Stage 1 properly later. Do **not** skip
-> to Stage 1 — it is what makes Stage 2's frozen backbone useful.
+Expect **27,558 images / 1,408 fields**. If you see **55,116**, the archive was
+unzipped twice and left a nested `cell_images/`; `prepare_data.py` now detects
+that, drops the duplicates and prints a warning telling you which directory to
+inspect:
+
+```
+[prepare] WARNING dropped 27,558 records whose filename was already indexed ...
+```
+
+Verify before training:
+
+```bash
+python - <<'PY'
+import json
+from pathlib import Path
+from src.train import DATASETS, REPO_ROOT
+
+for key in ("lacuna_phone", "nih_full"):
+    path = Path(REPO_ROOT) / DATASETS[key].manifest
+    if not path.exists():
+        print(key, "MISSING", path)
+        continue
+    m = json.loads(path.read_text())
+    print(f"{key:14s} {m['num_images']:6d} images  {m['num_patients']:4d} fields  "
+          f"labels={m['label_counts']}  license={m['license']}")
+PY
+```
+
+Expected: `nih_full  27558 images  1408 fields`, `lacuna_phone  8717 images  1003 fields`
+(after parsing the whole Uganda thin-smear archive), both with two non-empty
+label buckets. If `num_patients` is 1, the split is degenerate — `make test`
+catches that case.
 
 ---
 
@@ -216,9 +249,19 @@ python src/train.py --stage 2 --resume checkpoints/stage1/best.pt \
     --checkpoint-dir checkpoints/stage2/ --num-workers 8
 ```
 
+**Runtime reality check.** 27,558 crops ÷ batch 128 = 216 steps/epoch. On an L4
+that is roughly 1–2 minutes per epoch, so Stage 1 is **30–50 minutes**, not the
+20 the design note claims. On a free Colab T4 (2 vCPU, so also slow at data
+loading) budget **1.5–2 hours for Stage 1**. Stage 2 on the full 8,717 Lacuna
+crops is much smaller — about 15–25 minutes.
+
 Every epoch writes `epoch_{i}.pt`, `best.pt` and `last.pt`. `best.pt` is selected
 by a recall-first score, not accuracy — that is intentional. Sync out
 continuously (see section 7) so a preemption costs at most one epoch.
+
+**Do not start Stage 2 until `checkpoints/stage1/best.pt` exists.** Stage 2
+`--resume`s from it, and a missing checkpoint is the only thing that will stop
+the run after Stage 1 finishes.
 
 ---
 
@@ -329,7 +372,13 @@ git add -A && git commit -m "Stage 1+2 trained on NIH + Lacuna" && git push
 | Val split is empty / train=0 | Patient-level split degenerated. `make test` catches this. |
 | Threshold in the sidecar is ~0.5 on a good model | The `.json` sidecar was not co-located with the `.onnx`. It must sit next to it. |
 | Preempted mid-epoch | `gsutil rsync` from section 7 was not running. Re-run with `--resume`. |
+| `FileNotFoundError: 'checkpoints/stage1/best.pt'` | Stage 2 started before Stage 1 produced a checkpoint. Stage 1 must complete first — see section 6. |
+| `Manifest data/nih/manifest.json missing` | Run `prepare_data.py --dataset nih_full` (it now writes to the registry path). If you already have `data/nih_full/manifest.json`, it is picked up automatically. |
+| Manifest reports 2× the expected image count | The source tree was unzipped twice. `prepare_data.py` now drops the duplicates and prints the directory to inspect. |
+| `This DataLoader will create N worker processes ... suggested max is M` | Colab/small VM with few vCPUs. Harmless, but drop `--num-workers` to 2 to avoid slowdowns. |
+| `--num-workers 8` on a 2-vCPU box | Lower it. It does not fail, it just slows the loader down. |
 | `test_extract_without_backend_gives_instructions` fails | You have a RAR backend installed, so the "no backend" branch is skipped and rarfile raises `FileNotFoundError` on the dummy path. Fixed by monkeypatching `find_unrar`; update with `git pull`. |
+| `git push` says git-lfs not found | `sudo apt-get install -y git-lfs`. Blocks pushes only. |
 
 ---
 

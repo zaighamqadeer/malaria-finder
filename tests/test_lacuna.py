@@ -283,6 +283,98 @@ class TestParseDataset:
 # --------------------------------------------------------------------------- #
 # Downloader (network calls mocked out)
 # --------------------------------------------------------------------------- #
+class TestDuplicateTreeDetection:
+    """The NIH Kaggle archive unzipped twice reports 2x the true image count.
+
+    Two copies of the tree are *distinct files*, so path identity does not catch
+    them; a crop is identified by its filename. Regression test for a manifest
+    that silently reported 55,116 images instead of 27,558.
+    """
+
+    def _tree(self, root: Path, copies: int = 1) -> None:
+        import cv2
+
+        rng = np.random.default_rng(0)
+        for cls in ("Parasitized", "Uninfected"):
+            for slide in range(3):
+                for cell in range(4):
+                    d = root / cls
+                    d.mkdir(parents=True, exist_ok=True)
+                    # real NIH filenames embed a unique field id, so they never
+                    # collide across the two class folders
+                    name = f"F{slide:03d}_{cls[:4]}_IMG_1_cell_{cell:02d}.png"
+                    img = (rng.random((64, 64, 3)) * 255).astype(np.uint8)
+                    cv2.imwrite(str(d / name), img)
+        # plant `copies - 1` nested duplicates of the whole tree
+        for _ in range(copies - 1):
+            nested = root / "cell_images"
+            nested.mkdir(parents=True, exist_ok=True)
+            for p in root.rglob("*.png"):
+                if nested in p.parents:
+                    continue
+                dst = nested / p.relative_to(root)
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                dst.write_bytes(p.read_bytes())
+
+    def test_clean_tree_is_unchanged(self, tmp_path):
+        from src.prepare_data import _dedupe_records
+
+        src = tmp_path / "cell_images"
+        self._tree(src, copies=1)
+        recs = [{"path": str(p)} for p in src.rglob("*.png")]
+        unique, dropped = _dedupe_records(recs)
+        assert dropped == 0
+        assert len(unique) == len(recs)
+
+    def test_nested_duplicate_is_collapsed(self, tmp_path):
+        from src.prepare_data import _dedupe_records
+
+        src = tmp_path / "cell_images"
+        self._tree(src, copies=2)
+        recs = [{"path": str(p)} for p in src.rglob("*.png")]
+        assert len(recs) == 48  # 24 crops, two copies each
+        unique, dropped = _dedupe_records(recs)
+        assert dropped == 24
+        assert len(unique) == 24
+
+    def test_collect_records_warns_on_a_doubled_tree(self, tmp_path):
+        """End-to-end: the manifest must not double the dataset."""
+        from src.prepare_data import SOURCES, collect_records, _dedupe_records
+
+        src = tmp_path / "cell_images"
+        self._tree(src, copies=2)
+        info = SOURCES["nih_full"]
+        recs = collect_records(src, info.domain, info.source_name, info.license)
+        unique, dropped = _dedupe_records(recs)
+        assert dropped == 24, "the nested tree was not collapsed"
+        assert len(unique) == 24
+
+
+class TestPrepareDataPaths:
+    def test_registry_path_is_the_write_target(self, monkeypatch):
+        """--dataset nih_full must write where src/train.py looks."""
+        from src.prepare_data import _registry_manifest_path
+
+        path = _registry_manifest_path("nih_full")
+        assert path is not None
+        assert str(path).endswith("data/nih/manifest.json"), (
+            "prepare_data wrote data/nih_full/ but train.py reads data/nih/ - "
+            "exactly the mismatch that broke Stage 1"
+        )
+
+    def test_lacuna_registry_path(self):
+        from src.prepare_data import _registry_manifest_path
+
+        path = _registry_manifest_path("lacuna_phone")
+        assert path is not None
+        assert str(path).endswith("lacuna_crops/manifest.json")
+
+    def test_unknown_key_returns_none(self):
+        from src.prepare_data import _registry_manifest_path
+
+        assert _registry_manifest_path("not_a_dataset") is None
+
+
 class TestDownloaderUnits:
     def test_part_index_parsing(self):
         from src.download_lacuna import DataFile
