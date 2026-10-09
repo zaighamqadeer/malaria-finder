@@ -319,6 +319,9 @@ git add -A && git commit -m "Stage 1+2 trained on NIH + Lacuna" && git push
 | `git clone` asks for a password, fails | Private repo — use section 3. PAT needs `repo` scope. |
 | `No module named 'onnxscript'` | `pip install -r requirements.txt` not run, or interrupted. |
 | `RarCannotExec: Cannot find working tool` | Missing RAR backend: `sudo apt-get install -y unrar-free` |
+| `No RAR extractor found` | Same as above. Run `which unrar unrar-free 7z bsdtar` — at least one must exist. |
+| `Archive not found: ...` (from `src/download_lacuna.py`) | You passed `--extract-only` or an `--extract-to` dir with no archive in it. Fetch it first with `--files`, or point `--local-dir` at where it already lives. |
+| `Failed to extract ... make sure every part is present` | Multi-part archive and a part is missing, or you passed `.part2.rar` instead of `.part1.rar`. |
 | `ModuleNotFoundError: No module named 'app.inference'` | You are running a *staged* flat Space copy. In-repo this should not happen. |
 | `"dataset root not found"` | Manifest missing. Run the `prepare_data.py` / `parse_lacuna.py` step first. |
 | Training OOMs on the L4 | Drop `--batch` to 64 (Stage 1) or 32 (Stage 2). |
@@ -326,6 +329,7 @@ git add -A && git commit -m "Stage 1+2 trained on NIH + Lacuna" && git push
 | Val split is empty / train=0 | Patient-level split degenerated. `make test` catches this. |
 | Threshold in the sidecar is ~0.5 on a good model | The `.json` sidecar was not co-located with the `.onnx`. It must sit next to it. |
 | Preempted mid-epoch | `gsutil rsync` from section 7 was not running. Re-run with `--resume`. |
+| `test_extract_without_backend_gives_instructions` fails | You have a RAR backend installed, so the "no backend" branch is skipped and rarfile raises `FileNotFoundError` on the dummy path. Fixed by monkeypatching `find_unrar`; update with `git pull`. |
 
 ---
 

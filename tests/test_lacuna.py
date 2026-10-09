@@ -336,12 +336,38 @@ class TestDownloaderUnits:
         monkeypatch.setattr(dl.shutil, "which", lambda _name: None)
         assert dl.find_unrar() is None
 
-    def test_extract_without_backend_gives_instructions(self, tmp_path):
+    def test_extract_without_backend_gives_instructions(self, tmp_path, monkeypatch):
+        """The 'no extractor' message must not depend on what is installed.
+
+        This used to only pass on machines with no 7z/bsdtar/unrar on PATH:
+        where one exists, find_unrar() returns it and the code fell through to
+        rarfile, raising a bare FileNotFoundError instead of the instructions.
+        Force the missing-backend branch so the test is hermetic.
+        """
         from src.download_lacuna import extract_rar
 
+        monkeypatch.setattr(
+            "src.download_lacuna.find_unrar", lambda explicit=None: None
+        )
+        archive = tmp_path / "present.rar"
+        archive.write_bytes(b"Rar!\x1a\x07\x00" + b"\x00" * 64)  # valid RAR4 magic
         with pytest.raises(RuntimeError) as exc:
-            extract_rar(tmp_path / "x.rar", tmp_path, tool="/nonexistent/unrar")
-        assert "apt-get install" in str(exc.value)
+            extract_rar(archive, tmp_path, tool="/nonexistent/unrar")
+        msg = str(exc.value)
+        assert "apt-get install" in msg
+        assert "unrar-free" in msg
+
+    def test_extract_reports_a_missing_archive_clearly(self, tmp_path, monkeypatch):
+        """A missing archive must not surface as a raw rarfile traceback."""
+        from src.download_lacuna import extract_rar
+
+        # pretend a backend exists so we reach the archive check
+        monkeypatch.setattr(
+            "src.download_lacuna.find_unrar", lambda explicit=None: "/usr/bin/true"
+        )
+        with pytest.raises(FileNotFoundError) as exc:
+            extract_rar(tmp_path / "nope.rar", tmp_path, tool="/usr/bin/true")
+        assert "--files" in str(exc.value)
 
 
 class TestDatasetRegistry:

@@ -237,6 +237,15 @@ def extract_rar(archive: Path, dest: Path, tool: str | None = None) -> Path:
     (``Thick_Ghana.part1.rar``); the remaining parts are picked up automatically
     because they share the same directory.
     """
+    archive = Path(archive)
+    if not archive.exists():
+        raise FileNotFoundError(
+            f"Archive not found: {archive}\n"
+            f"Pass --files <name> to download it first, or --local-dir / "
+            f"--extract-only if it lives elsewhere."
+        )
+
+    dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
     backend = find_unrar(tool)
     if backend is None:
@@ -244,7 +253,8 @@ def extract_rar(archive: Path, dest: Path, tool: str | None = None) -> Path:
             "No RAR extractor found. `rarfile` needs an external backend:\n"
             "  Ubuntu/Debian : sudo apt-get install -y unrar-free   # or: unrar\n"
             "  macOS         : brew install unrar\n"
-            "  generic       : download UnRAR from https://www.rarlab.com/rar/unrarsrc-7.1.10.tar.gz\n"
+            "  generic       : download UnRAR from "
+            "https://www.rarlab.com/rar/unrarsrc-7.1.10.tar.gz\n"
             "Then re-run with --unrar /path/to/unrar"
         )
 
