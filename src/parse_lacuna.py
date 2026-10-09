@@ -437,6 +437,10 @@ def parse_dataset(cfg: ParseConfig) -> dict[str, Any]:
         "negatives_from_background": cfg.negatives_from_background,
         "num_crops": len(records),
         "num_fields": len({r["patient_id"] for r in records}),
+        # aliases so generic tooling (e.g. src/prepare_data.py manifests) that
+        # expects num_images / num_patients works on this file unchanged
+        "num_images": len(records),
+        "num_patients": len({r["patient_id"] for r in records}),
         "label_counts": {
             "0": sum(1 for r in records if int(r["label"]) == 0),
             "1": sum(1 for r in records if int(r["label"]) == 1),
