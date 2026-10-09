@@ -7,9 +7,10 @@
 #   make help    # list targets
 
 PYTHON ?= python
+HF_NAMESPACE ?= your-hf-username
 .DEFAULT_GOAL := help
 
-.PHONY: help smoke test lint seg app data clean
+.PHONY: help smoke test lint seg app publish data clean
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -40,6 +41,9 @@ seg: ## Segmentation recall / precision vs the synthetic ground truth
 
 app: ## Launch the Gradio UI
 	$(PYTHON) app/app.py --port 7860
+
+publish: ## Publish weights + model card + demo to the Hugging Face Hub
+	$(PYTHON) scripts/publish_hf.py --namespace $(HF_NAMESPACE)
 
 data: ## Generate the synthetic mock data used by the smoke run
 	$(PYTHON) src/make_sample_data.py --mode crops --total 400

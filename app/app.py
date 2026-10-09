@@ -11,6 +11,8 @@ in English, Urdu or Polish.
 from __future__ import annotations
 
 import json
+import os
+import shutil
 
 import argparse
 import sys
@@ -26,13 +28,72 @@ MODEL_CANDIDATES = [
     REPO_ROOT / "checkpoints" / "stage1" / "best.pt",
 ]
 
+# On Hugging Face Spaces (and any other containerised deploy) the weights are
+# not in the image. Set TINYMALARIA_MODEL_URL to fetch them once at startup and
+# cache them under models/downloaded/. The sidecar .json is fetched too, because
+# that is where the calibrated decision threshold lives.
+MODEL_URL_ENV = "TINYMALARIA_MODEL_URL"
+MODEL_CACHE = REPO_ROOT / "models" / "downloaded"
+
 LANGUAGES = {"en": "English", "ur": "اردو (Urdu)", "pl": "Polski (Polish)"}
 
 
+def _fetch_model(url: str) -> Path | None:
+    """Download a model (and its sidecar) over HTTP, or pull from the HF Hub."""
+    import shutil
+
+    dest = MODEL_CACHE / Path(url.split("?")[0]).name
+    if dest.exists():
+        return dest
+    try:
+        if url.startswith("hf://"):
+            from huggingface_hub import hf_hub_download
+
+            repo_id, _, filename = url[5:].partition("/")
+            got = hf_hub_download(repo_id=repo_id, filename=filename)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(got, dest)
+        else:
+            from urllib.request import Request, urlopen
+
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            req = Request(url, headers={"User-Agent": "TinyMalariaNet-app/1.0"})
+            with urlopen(req, timeout=300) as resp, dest.open("wb") as fh:  # noqa: S310
+                shutil.copyfileobj(resp, fh)
+
+        # The sidecar carries the calibrated threshold. Without it the app
+        # silently falls back to 0.5 and the recall target is lost.
+        side = dest.with_suffix(".json")
+        if not side.exists():
+            for cand in (url + ".json", url.replace(".onnx", ".json")):
+                try:
+                    req = Request(cand, headers={"User-Agent": "TinyMalariaNet-app/1.0"})
+                    with urlopen(req, timeout=120) as resp, side.open("wb") as fh:
+                        shutil.copyfileobj(resp, fh)
+                    print(f"[app] sidecar fetched from {cand}")
+                    break
+                except Exception:
+                    continue
+        print(f"[app] model cached at {dest}")
+        return dest
+    except Exception as exc:  # pragma: no cover - deploy-time failure
+        print(f"[app] could not fetch model from {url}: {exc}")
+        return None
+
+
 def pick_model() -> Path | None:
+    env_url = os.environ.get(MODEL_URL_ENV, "").strip()
+    if env_url:
+        fetched = _fetch_model(env_url)
+        if fetched is not None:
+            return fetched
     for path in MODEL_CANDIDATES:
         if path.exists():
             return path
+    if MODEL_CACHE.exists():
+        cached = sorted(MODEL_CACHE.glob("*.onnx"))
+        if cached:
+            return cached[0]
     return None
 
 
@@ -51,10 +112,28 @@ no on-device LLM.
 """
 
 
+def _load_inference():
+    """Import the pipeline package in whichever layout this file is running in.
+
+    In the repository the entry point is ``app/app.py`` and the pipeline module
+    is ``app/inference.py``. In the Hugging Face Space both files are siblings
+    at the repository root, so ``app`` resolves to this very module instead of a
+    package. Try the packaged name first, fall back to the flat one.
+    """
+    try:
+        from app import inference
+    except ImportError:
+        import inference  # type: ignore[no-redef]
+    return inference
+
+
 def build_demo(model_path: Path | None):
     import gradio as gr
 
-    from app.inference import MalariaPipeline, PipelineConfig, annotate_image
+    _inference = _load_inference()
+    MalariaPipeline = _inference.MalariaPipeline
+    PipelineConfig = _inference.PipelineConfig
+    annotate_image = _inference.annotate_image
 
     with gr.Blocks(title="TinyMalariaNet") as demo:
         gr.Markdown(_HEADER)

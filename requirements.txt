@@ -33,3 +33,6 @@ gradio==6.30.0
 
 # Dev / test (not needed at inference time)
 pytest>=8.0
+
+# Release / publishing - scripts/publish_hf.py only, not needed to run the app
+huggingface_hub>=0.20

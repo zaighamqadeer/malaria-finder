@@ -273,7 +273,6 @@ def load_label_map(labels_file: Path) -> dict[str, int]:
     label_col = next((k for k in keys if k.lower() in {"label", "class", "y",
                                                        "infected"}), None)
     if label_col is None:  # no explicit label column: fall back to folder names
-        fh.seek(0) if False else None
         return {}
     out = {}
     for row in rows:
@@ -411,8 +410,7 @@ def run(args: argparse.Namespace) -> int:
             picked.extend(items[:per])
         records = picked
 
-    extra = {"sha256": sha256_of(manifest_path)} if False else None
-    write_manifest(records, info, manifest_path, extra)
+    write_manifest(records, info, manifest_path)
     if not info.commercial_use_ok:
         _rime(f"[prepare] NOTE: {info.key} is licensed {info.license}. "
               "It must not be mixed into a commercially redistributed model.")

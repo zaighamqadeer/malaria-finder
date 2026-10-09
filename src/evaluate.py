@@ -154,7 +154,7 @@ def evaluate_checkpoint(
     auc = float(roc_auc_score(y, p)) if len(np.unique(y)) > 1 else float("nan")
     ap = float(average_precision_score(y, p)) if len(np.unique(y)) > 1 else float("nan")
     j_scores = tpr - fpr
-    youden_t = float(_[np.argmax(j_scores)]) if len(_) else 0.5
+    youden_t = float(_[np.argmax(j_scores)]) if len(j_scores) else 0.5
 
     threshold, operating = sensitivity_first_threshold(y, p, target_recall)
 

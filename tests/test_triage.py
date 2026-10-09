@@ -68,11 +68,13 @@ class TestTriageFileShape:
     def test_urgency_ordering(self, triage):
         order = {"negative": 0, "low": 1, "mild": 2, "moderate": 3, "severe": 4}
         for level, block in triage["severity_levels"].items():
-            assert order[level] == int(order[level])
             assert isinstance(block["urgency"], str) and block["urgency"]
         # severity escalates monotonically with the band
         assert order["negative"] < order["low"] < order["mild"] \
             < order["moderate"] < order["severe"]
+        # every band except "negative" must be escalated
+        for level in ("low", "mild", "moderate", "severe"):
+            assert triage["severity_levels"][level]["urgency"] != "none"
 
     def test_high_parasitemia_requires_expert_review(self, triage):
         for level in ("low", "mild", "moderate", "severe"):

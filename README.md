@@ -359,7 +359,50 @@ ranges, `render_triage` returns a fallback for an unsupported language, the
 INT8 footprint stays under budget, and the classifier backends agree on the
 preprocessed input.
 
-## 10. License
+## 10. Release
+
+**Publishing to Hugging Face** (design doc Day 5):
+
+```bash
+pip install huggingface_hub && huggingface-cli login
+
+make publish HF_NAMESPACE=your-hf-username      # or, explicitly:
+python scripts/publish_hf.py --namespace your-hf-username --dry-run
+```
+
+This uploads two repositories:
+
+| Repo | Contents |
+| --- | --- |
+| `you/tinymalaria-net` (model) | the INT8 ONNX graph, its calibrated `.json` sidecar, `MODEL_CARD.md` |
+| `you/tinymalaria-demo` (Gradio Space) | the app, which pulls the weights at cold start |
+
+The Space is told where the weights live by the `TINYMALARIA_MODEL_URL` secret —
+set it to `hf://your-hf-username/tinymalaria-net/tinymalaria_int8.onnx`. The
+script prints this when it finishes. Without the sidecar the app silently falls
+back to a 0.5 threshold and loses the calibrated recall target, so the fetcher
+pulls both files.
+
+The script **refuses to publish** a synthetic smoke-test artifact or one with no
+declared license; `--force` overrides that deliberately.
+
+## 11. Project status
+
+| Design-doc step | Status |
+| --- | --- |
+| Day 1 — repo, segmenter extracts RBCs, 1-epoch dry run | ✅ done |
+| Day 2 — deterministic `triage.json`, Gradio full-image upload | ✅ done |
+| Day 3 — GCP Spot, Stage 1 (NIH) + Stage 2 (Lacuna) | ⬜ **not run** — the remaining step |
+| Day 4 — INT8 export, <2.5 MB, recall ≥98% | ✅ done |
+| Day 5 — model card, HF weights, live demo | ✅ tooling ready, not yet run |
+
+What is genuinely finished: the full pipeline, 118 tests, a real-data model at
+98.7% held-out sensitivity, and a 1.796 MB INT8 artifact. What is not: Stage 1
+running on the full 27,558-crop NIH set. The shipped model was warmed on
+synthetic crops and trained on 120 Lacuna fields — a proof of concept, not the
+design's target. Section 7 has the commands for that run.
+
+## 12. License
 
 Apache License 2.0. See [LICENSE](LICENSE).
 
