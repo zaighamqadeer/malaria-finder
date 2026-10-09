@@ -1,0 +1,51 @@
+# Data & artifacts.
+#
+# The two small SYNTHETIC dev sets ARE tracked (they are what the design doc's
+# verification steps reference, and they let a fresh clone run
+# `python src/segment.py --test-image data/phone_test/...` and `make test`
+# without downloading anything). Everything else - raw dataset downloads,
+# extracted archives, parsed crops, checkpoints and models - is derived output
+# that must be regenerated on the machine that needs it:
+#
+#   make data                        # regenerate the synthetic dev sets
+#   python src/download_lacuna.py --files Thin_Uganda.rar --extract --extract-to data/lacuna
+#   python src/parse_lacuna.py --src data/lacuna --out data/processed/lacuna_crops
+#
+# `data/*` (not `data/`) is required so the negations below can re-include the
+# two dev directories: git cannot re-include a file whose parent is excluded.
+data/*
+!data/sample/
+!data/phone_test/
+
+# Training output
+checkpoints/
+models/
+models_qat/
+build/
+*.pt
+*.onnx
+*.tflite
+*.pth
+*.pkl
+
+# Caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.cache/
+*.egg-info/
+.venv/
+venv/
+
+# Logs & local state
+*.log
+runs/
+wandb/
+.DS_Store
+*.swp
+.env
+
+# Dev scratch
+scratch/
+tmp/

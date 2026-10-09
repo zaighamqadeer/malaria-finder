@@ -1,0 +1,130 @@
+{
+  "_comment": "Deterministic, clinician-vetted triage templates for TinyMalariaNet. No on-device LLM is used: the pipeline computes parasitemia and selects one of these static blocks. Language codes follow BCP-47. All content is a screening aid, never a diagnosis.",
+  "_version": "1.0.0",
+  "schema": "tinymalaria.triage.v1",
+
+  "disclaimer": {
+    "en": "SCREENING RESULT ONLY. This is not a medical diagnosis. Confirm with a laboratory blood smear (thick and thin film) examined by a qualified microscopist, and consult a healthcare professional before taking any treatment decision.",
+    "ur": "یہ صرف ایک ابتدائی اسکریننگ کا نتیجہ ہے۔ یہ طبی تشخیص نہیں ہے۔ براہِ کرم تجویز کردہ لیبارٹری بلڈ اسمر (تھک اینڈ تھن فلم) سے تصدیق کریں اور کوئی بھی علاجی فیصلہ کرنے سے پہلے کسی اہم صحت فراہم کنندہ سے رجوع کریں۔",
+    "pl": "WYNIK TYLKO WSTĘPNEGO BADANIA PRZESIEWOWEGO. Nie jest to diagnoza medyczna. Potwierdź badanie laboratoryjnym rozmazem krwi (grubym i cienkim) ocenionym przez wykwalifikowanego mikroskopistę i skonsultuj się z personelem medycznym przed podjęciem decyzji o leczeniu."
+  },
+
+  "severity_levels": {
+    "negative": {
+      "parasitemia_range": [0.0, 0.0],
+      "urgency": "none",
+      "require_expert_review": false,
+      "header": {
+        "en": "No parasites detected in the analysed field",
+        "ur": "تجزیہ شدہ فیلڈ میں کوئی پارازائٹ نہیں پایا گیا",
+        "pl": "Nie wykryto pasożytów w analizowanym polu"
+      },
+      "action": {
+        "en": "Continue routine monitoring. A single field does not exclude malaria; repeat the smear if clinical suspicion remains or fever persists.",
+        "ur": "معیاری نگرانی جاری رکھیں۔ ایک فیلڈ ملیریا کو خارج نہیں کرتی؛ اگر تشخیص کا شبہ باقی ہے یا بخار جاری رہے تو دوبارہ اسمر لیں۔",
+        "pl": "Kontynuuj rutynowe monitorowanie. Jedno pole mikroskopowe nie wyklucza malarii; powtórz rozmaz, jeśli podejrzenie kliniczne pozostaje lub gorączka utrzymuje się."
+      },
+      "recommendation": {
+        "en": "Log the result with the field image, patient/slide ID and timestamp for the care record.",
+        "ur": "نتیجہ کو فیلڈ امیج، مریض/سلائیڈ آئی ڈی اور وقت کے ساتھ ریکارڈ میں درج کریں۔",
+        "pl": "Zapisz wynik wraz ze zdjęciem pola, identyfikatorem pacjenta/szkiełka i datą w dokumentacji."
+      }
+    },
+    "low": {
+      "parasitemia_range": [0.0, 1.0],
+      "urgency": "low",
+      "require_expert_review": true,
+      "header": {
+        "en": "Very low parasitemia",
+        "ur": "بہت کم پارازمیا",
+        "pl": "Bardzo niska parazytemia"
+      },
+      "action": {
+        "en": "Re-screen immediately on multiple fresh fields. Low counts are easy to miss and repeat scanning strongly affects sensitivity.",
+        "ur": "فوراً متعدد نئے فیلڈز پر دوبارہ اسکریننگ کریں۔ کم تعداد میں پکڑے جانے کا امکان کم ہوتا ہے اور دوبارہ اسکین سے حساسیت بہت متاثر ہوتی ہے۔",
+        "pl": "Natychmiast wykonaj ponowny przegląd wielu świeżych pól. Niskie wartości są łatwe do przeoczenia, a powtarzalne skanowanie mocno wpływa na czułość."
+      },
+      "recommendation": {
+        "en": "Treat the result as indeterminate. Refer for confirmatory microscopy and clinical assessment the same day.",
+        "ur": "نتیجہ کو غیر قطعی سمجھیں۔ اسی دن تصدیقی مائیکروسکوپی اور طبی جائزہ کے لیے ریفر کریں۔",
+        "pl": "Traktuj wynik jako niejednoznaczny. Kieruj do mikroskopii potwierdzającej i oceny klinicznej tego samego dnia."
+      }
+    },
+    "mild": {
+      "parasitemia_range": [1.0, 5.0],
+      "urgency": "moderate",
+      "require_expert_review": true,
+      "header": {
+        "en": "Mild malaria parasitemia detected",
+        "ur": "ہلکے ملیریا پارازمیا پایا گیا",
+        "pl": "Wykryto łagodną parazytemię malarii"
+      },
+      "action": {
+        "en": "Refer to a clinician for confirmatory microscopy and a full clinical review (fever pattern, travel/residence history, pregnancy, age).",
+        "ur": "تصدیقی مائیکروسکوپی اور مکمل طبی جائزہ (بخار کا رویہ، سفر/رہائش کی تاریخ، حمل، عمر) کے لیے معالج کے پاس ریفر کریں۔",
+        "pl": "Skieruj do lekarza w celu mikroskopii potwierdzającej i pełnej oceny klinicznej (wzorzec gorączki, historia podróży/pobytu, ciąża, wiek)."
+      },
+      "recommendation": {
+        "en": "Record the parasitemia percentage and repeat after treatment to monitor response.",
+        "ur": "پارازمیا کی شرح درج کریں اور علاج کے بعد جواب کی نگرانی کے لیے دوبارہ کریں۔",
+        "pl": "Zapisz procent parazytemii i powtórz po leczeniu, aby monitorować odpowiedź."
+      }
+    },
+    "moderate": {
+      "parasitemia_range": [5.0, 10.0],
+      "urgency": "high",
+      "require_expert_review": true,
+      "header": {
+        "en": "Moderate malaria parasitemia detected",
+        "ur": "درمیانی درجے کا ملیریا پارازمیا پایا گیا",
+        "pl": "Wykryto umiarkowaną parazytemię malarii"
+      },
+      "action": {
+        "en": "Escalate for same-day clinical review. Do not delay referral pending confirmation.",
+        "ur": "اسی روز طبی جائزے کے لیے فوراً ایسکیلیٹ کریں۔ تصدیق کا انتظار کیے بغیر ریفرل میں تاخیر نہ کریں۔",
+        "pl": "Eskaluj do oceny klinicznej tego samego dnia. Nie opóźniaj skierowania w oczekiwaniu na potwierdzenie."
+      },
+      "recommendation": {
+        "en": "Prioritise this case in the referral queue and flag it for urgent laboratory confirmation.",
+        "ur": "اس کیس کو ریفرل قطار میں ترجیح دیں اور فوری لیبارٹری تصدیق کے لیے نشان زد کریں۔",
+        "pl": "Nadaj priorytet tej sprawie w kolejce skierowań i oznacz do pilnego potwierdzenia laboratoryjnego."
+      }
+    },
+    "severe": {
+      "parasitemia_range": [10.0, 100.0],
+      "urgency": "critical",
+      "require_expert_review": true,
+      "header": {
+        "en": "HIGH parasitemia - treat as severe malaria risk",
+        "ur": "زیادہ پارازمیا — سنگین ملیریا کے خطرے کے طور پر علاج کریں",
+        "pl": "WYSOKA parazytemia — traktuj jako ryzyko malarii ciężkiej"
+      },
+      "action": {
+        "en": "URGENT. Parasitemia above 10% meets a WHO severity criterion. Arrange immediate clinical assessment and, if confirmed, parenteral treatment under supervision.",
+        "ur": "فوری۔ ۱۰٪ سے زیادہ پارازمیا عالمی ادارہ صحت (WHO) کے سنگین ملیریا کے معیار کو پورا کرتی ہے۔ فوری طبی جائزہ کا بندوبست کریں اور تصدیق کی صورت میں نگرانی میں والدوی علاج کریں۔",
+        "pl": "PILNE. Parazytemia powyżej 10% spełnia kryterium ciężkości WHO. Zapewnij natychmiastową ocenę kliniczną, a po potwierdzeniu leczenie pozajelitowe pod nadzorem."
+      },
+      "recommendation": {
+        "en": "Also screen for other red-flag features (impaired consciousness, prostration, jaundice, severe anaemia) and escalate to the highest available level of care.",
+        "ur": "دیگر خطرناک علامات (شعور کی خرابی، کمزوری، یرقان، شدید انیمیا) کی جانچ بھی کریں اور اعلیٰ سطح کی دیکھ بھال تک منتقل کریں۔",
+        "pl": "Sprawdź również inne czerwone flagi (zaburzenia świadomości, osłabienie, żółtaczka, ciężka niedokrwistość) i eskalację do najwyższego dostępnego poziomu opieki."
+      }
+    }
+  },
+
+  "segmentation_warnings": {
+    "no_cells": {
+      "en": "No candidate red blood cells were found in the image. Check focus, illumination and whether the field is centred.",
+      "ur": "امیج میں کوئی ممکنہ ریڈ بلڈ سیل نہیں ملا۔ فوکس، روشنی اور فیلڈ کے مرکز میں ہونے کی تصدیق کریں۔",
+      "pl": "Nie znaleziono kandydatów na krwinki czerwone na zdjęciu. Sprawdź ostrzenie, oświetlenie i czy pole jest wyśrodkowane."
+    },
+    "too_few_cells": {
+      "en": "Too few cells were segmented for a reliable percentage. Scan more fields before drawing a conclusion.",
+      "ur": "قابلِ اعتماد فیصد کے لیے بہت کم سیلز الگ کیے گئے۔ نتیجہ اخذ کرنے سے پہلے مزید فیلڈز اسکین کریں۔",
+      "pl": "Zbyt mało komórek zostało wysegmentowanych, aby wynik był wiarygodny. Przeskanaj więcej pól, zanim wyciągniesz wniosek."
+    }
+  },
+
+  "default_language": "en",
+  "supported_languages": ["en", "ur", "pl"]
+}
